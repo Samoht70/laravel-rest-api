@@ -105,15 +105,13 @@ trait PerformsRestOperations
 
         $this->beforeMutate($request);
 
-        DB::beginTransaction();
-
-        $operations = app()->make(QueryBuilder::class, ['resource' => $resource, 'query' => null])
-            ->tap(function ($query) use ($request) {
-                self::newResource()->mutateQuery($request, $query->toBase());
-            })
-            ->mutate($request->all());
-
-        DB::commit();
+        $operations = DB::transaction(function () use ($request, $resource) {
+            return app()->make(QueryBuilder::class, ['resource' => $resource, 'query' => null])
+                ->tap(function ($query) use ($request) {
+                    self::newResource()->mutateQuery($request, $query->toBase());
+                })
+                ->mutate($request->all());
+        });
 
         $this->afterMutate($request);
 
