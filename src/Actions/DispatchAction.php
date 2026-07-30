@@ -98,6 +98,8 @@ class DispatchAction
     {
         if ($this->action->isStandalone()) {
             $modelsImpacted = $this->handleStandalone();
+        } elseif ($this->action->isTargeted()) {
+            $modelsImpacted = $this->handleTargeted($chunkCount);
         } else {
             $modelsImpacted = $this->handleClassic($chunkCount);
         }
@@ -112,10 +114,8 @@ class DispatchAction
     /**
      * Processes models in chunks using classic mode and dispatches an action for each set.
      *
-     * The method builds a search query for the resource associated with the current request, applying
-     * search criteria from the request input and removing any default result limits. It then processes
-     * the query results in chunks (of size $chunkCount) by invoking the forModels method on each chunk.
-     * Finally, it returns the query limit if one is set; otherwise, it returns the total count of models.
+     * The impacted models are whatever the request's search resolves, which is every model when
+     * the search is omitted.
      *
      * @param int $chunkCount The number of models to process per chunk.
      *
@@ -123,18 +123,50 @@ class DispatchAction
      */
     public function handleClassic(int $chunkCount)
     {
-        /**
-         * @var Builder $searchQuery
-         */
-        $searchQuery =
-            app()->make(QueryBuilder::class, ['resource' => $this->request->resource, 'query' => null])
-                ->disableDefaultLimit()
-                ->search($this->request->input('search', []));
+        return $this->handleSearchQuery($this->searchQuery(), $chunkCount);
+    }
 
-        if ($this->action->isTargeted()) {
-            $searchQuery->whereKey($this->request->input('resources', []));
-        }
+    /**
+     * Processes the models explicitly targeted by the request and dispatches an action for each set.
+     *
+     * The ids given in the request's resources key narrow the search query, so the impacted models
+     * are the intersection of those ids and whatever the search resolves. Everything else behaves
+     * as classic mode.
+     *
+     * @param int $chunkCount The number of models to process per chunk.
+     *
+     * @return int The effective result limit if set, or the total count of models.
+     */
+    public function handleTargeted(int $chunkCount)
+    {
+        return $this->handleSearchQuery(
+            $this->searchQuery()->whereKey($this->request->input('resources', [])),
+            $chunkCount
+        );
+    }
 
+    /**
+     * Build the search query resolving the models the action applies to.
+     *
+     * @return Builder
+     */
+    protected function searchQuery()
+    {
+        return app()->make(QueryBuilder::class, ['resource' => $this->request->resource, 'query' => null])
+            ->disableDefaultLimit()
+            ->search($this->request->input('search', []));
+    }
+
+    /**
+     * Processes the given search query in chunks and dispatches an action for each set.
+     *
+     * @param Builder $searchQuery The query resolving the models to act on.
+     * @param int     $chunkCount  The number of models to process per chunk.
+     *
+     * @return int The effective result limit if set, or the total count of models.
+     */
+    protected function handleSearchQuery(Builder $searchQuery, int $chunkCount)
+    {
         $limit = $searchQuery->toBase()->limit;
 
         $searchQuery
