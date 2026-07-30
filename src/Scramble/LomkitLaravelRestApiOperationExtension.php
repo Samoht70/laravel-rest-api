@@ -182,7 +182,7 @@ class LomkitLaravelRestApiOperationExtension extends OperationExtension
                         )
                         ->addProperty(
                             'alias',
-                            (new StringType())->setDescription('Optional output key for this include. Allows including the same relation several times under different keys.')
+                            (new StringType())->setDescription('Optional output key for this include, used verbatim. Allows including the same relation several times under different keys. Must match ^[A-Za-z_][A-Za-z0-9_]*$, be unique across the includes, and not collide with a field, a relation or the gates key. Not allowed on a dotted relation path.')
                         )
                         ->addProperty('limit', new IntegerType())
                         ->addProperty('filters', new ArrayType())

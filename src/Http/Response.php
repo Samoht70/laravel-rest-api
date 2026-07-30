@@ -127,13 +127,14 @@ class Response implements Responsable
 
                     $relationConcrete = $resource->relation($realRelation);
                     $relationResource = $relationConcrete->resource();
+                    $nestedRequestArray = $this->requestArrayForRelation($requestArray, $currentInclude, $relationName);
 
                     if ($modelRelation instanceof Model) {
                         return [
                             $key => $this->modelToResponse(
                                 $modelRelation,
                                 $relationResource,
-                                $currentInclude ?? [],
+                                $nestedRequestArray,
                                 $relationConcrete
                             ),
                         ];
@@ -141,12 +142,46 @@ class Response implements Responsable
 
                     return [
                         $key => $modelRelation
-                            ->map(fn ($collectionRelation) => $this->modelToResponse($collectionRelation, $relationResource, $currentInclude ?? [], $relationConcrete))
+                            ->map(fn ($collectionRelation) => $this->modelToResponse($collectionRelation, $relationResource, $nestedRequestArray, $relationConcrete))
                             ->toArray(),
                     ];
                 })
                 ->toArray()
         );
+    }
+
+    /**
+     * Build the request array a relation is rendered with.
+     *
+     * A dotted include declares its parameters for the deepest relation of the path, the same way
+     * the query applies them, so every level above only forwards the remaining path downwards.
+     *
+     * @param array      $requestArray   Request parameters of the level being rendered.
+     * @param array|null $currentInclude The include matching the relation, if any.
+     * @param string     $relationName   The name the relation is loaded under.
+     *
+     * @return array The request parameters to render the relation with.
+     */
+    protected function requestArrayForRelation(array $requestArray, ?array $currentInclude, string $relationName): array
+    {
+        $forwardedIncludes = collect($requestArray['includes'] ?? [])
+            ->filter(function ($include) use ($relationName) {
+                return Str::contains($include['relation'], '.')
+                    && Str::before($include['relation'], '.') === $relationName;
+            })
+            ->map(function ($include) {
+                return array_merge($include, ['relation' => Str::after($include['relation'], '.')]);
+            })
+            ->values()
+            ->all();
+
+        $nestedRequestArray = $currentInclude ?? [];
+
+        if (!empty($forwardedIncludes)) {
+            $nestedRequestArray['includes'] = array_merge($nestedRequestArray['includes'] ?? [], $forwardedIncludes);
+        }
+
+        return $nestedRequestArray;
     }
 
     public function toResponse($request)

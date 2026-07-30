@@ -4,6 +4,7 @@ namespace Lomkit\Rest\Query\Traits;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lomkit\Rest\Http\Requests\RestRequest;
 
@@ -229,10 +230,10 @@ trait PerformSearch
     /**
      * Manually eager load an include under its alias key.
      *
-     * @param \Illuminate\Support\Collection $models  The parent models to hydrate.
-     * @param array                          $include The include definition, containing 'relation' and 'alias'.
+     * @param Collection $models  The parent models to hydrate.
+     * @param array      $include The include definition, containing 'relation' and 'alias'.
      */
-    protected function includeAliased($models, array $include): void
+    protected function includeAliased(Collection $models, array $include): void
     {
         $models = $models->all();
 
@@ -240,17 +241,48 @@ trait PerformSearch
             return;
         }
 
-        $relation = reset($models)->{$include['relation']}();
+        $relationName = $include['relation'];
+        $alias = $include['alias'];
+
+        // Constraints must be disabled while instantiating, otherwise the relation is scoped
+        // to the model it was built from and the other parents resolve to nothing.
+        $relation = Relation::noConstraints(function () use ($models, $relationName) {
+            return reset($models)->newInstance()->{$relationName}();
+        });
+
         $relation->addEagerConstraints($models);
 
-        $resource = $this->resource->relation($include['relation'])?->resource();
+        $resource = $this->resource->relation($relationName)?->resource();
         $this->newQueryBuilder(['resource' => $resource, 'query' => $relation])->search($include);
 
+        // Matching has to happen under the real relation name: MorphTo hydrates parents from
+        // getEager() using that name and ignores the one given to match(). The results are moved
+        // to the alias afterwards, restoring whatever the same relation held before.
+        $loadedBeforeAliasing = [];
+
+        foreach ($models as $index => $model) {
+            if ($model->relationLoaded($relationName)) {
+                $loadedBeforeAliasing[$index] = $model->getRelation($relationName);
+            }
+        }
+
         $relation->match(
-            $relation->initRelation($models, $include['alias']),
+            $relation->initRelation($models, $relationName),
             $relation->getEager(),
-            $include['alias']
+            $relationName
         );
+
+        foreach ($models as $index => $model) {
+            $model->setRelation($alias, $model->getRelation($relationName));
+
+            if (array_key_exists($index, $loadedBeforeAliasing)) {
+                $model->setRelation($relationName, $loadedBeforeAliasing[$index]);
+
+                continue;
+            }
+
+            $model->unsetRelation($relationName);
+        }
     }
 
     /**
