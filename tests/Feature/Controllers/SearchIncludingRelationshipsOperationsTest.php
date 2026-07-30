@@ -1139,7 +1139,7 @@ class SearchIncludingRelationshipsOperationsTest extends TestCase
     public function test_including_nested_relation_with_a_dotted_path_applies_selects_to_the_deepest_relation(): void
     {
         $belongsTo = BelongsToRelationFactory::new()->create();
-        ModelFactory::new()->for($belongsTo)->create();
+        $matchingModel = ModelFactory::new()->for($belongsTo)->create();
 
         Gate::policy(Model::class, GreenPolicy::class);
         Gate::policy(BelongsToRelation::class, GreenPolicy::class);
@@ -1167,7 +1167,7 @@ class SearchIncludingRelationshipsOperationsTest extends TestCase
             array_keys(Arr::except($response->json('data.0.belongs_to_relation'), ['models']))
         );
         $this->assertSame(
-            [['id' => 1]],
+            [['id' => $matchingModel->id]],
             $response->json('data.0.belongs_to_relation.models')
         );
     }
@@ -1175,7 +1175,7 @@ class SearchIncludingRelationshipsOperationsTest extends TestCase
     public function test_including_nested_relation_with_a_deep_dotted_path_applies_selects_to_the_deepest_relation(): void
     {
         $belongsTo = BelongsToRelationFactory::new()->create();
-        ModelFactory::new()
+        $matchingModel = ModelFactory::new()
             ->for($belongsTo)
             ->has(HasManyRelationFactory::new())
             ->create();
@@ -1207,7 +1207,7 @@ class SearchIncludingRelationshipsOperationsTest extends TestCase
             array_keys(Arr::except($response->json('data.0.belongs_to_relation.models.0'), ['has_many_relation']))
         );
         $this->assertSame(
-            [['id' => 1]],
+            [['id' => $matchingModel->hasManyRelation->first()->id]],
             $response->json('data.0.belongs_to_relation.models.0.has_many_relation')
         );
     }
@@ -1243,11 +1243,16 @@ class SearchIncludingRelationshipsOperationsTest extends TestCase
 
     public function test_including_belongs_to_relation_with_alias_hydrates_every_parent(): void
     {
-        foreach (range(1, 3) as $ignored) {
-            ModelFactory::new()
-                ->for(BelongsToRelationFactory::new()->create())
-                ->create();
-        }
+        // Each model gets its own distinct parent, so a leaking constraint cannot go unnoticed.
+        $expectedOwnerIds = collect(range(1, 3))
+            ->map(function () {
+                return ModelFactory::new()
+                    ->for(BelongsToRelationFactory::new()->create())
+                    ->create()
+                    ->belongsToRelation
+                    ->id;
+            })
+            ->all();
 
         Gate::policy(Model::class, GreenPolicy::class);
         Gate::policy(BelongsToRelation::class, GreenPolicy::class);
@@ -1266,7 +1271,7 @@ class SearchIncludingRelationshipsOperationsTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertSame(
-            [1, 2, 3],
+            $expectedOwnerIds,
             array_map(fn ($model) => $model['owner']['id'], $response->json('data'))
         );
     }
