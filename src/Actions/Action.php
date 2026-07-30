@@ -13,6 +13,7 @@ use Lomkit\Rest\Concerns\Fieldable;
 use Lomkit\Rest\Concerns\Makeable;
 use Lomkit\Rest\Concerns\Metable;
 use Lomkit\Rest\Concerns\Resourcable;
+use Lomkit\Rest\Exceptions\InvalidActionStateException;
 use Lomkit\Rest\Http\Requests\OperateRequest;
 use Lomkit\Rest\Http\Requests\RestRequest;
 
@@ -57,11 +58,24 @@ class Action implements \JsonSerializable
     public $standalone = false;
 
     /**
+     * Indicates if the action requires an explicit list of resource ids and prohibits a search.
+     *
+     * @var bool
+     */
+    public $targeted = false;
+
+    /**
      * The number of models that should be included in each chunk.
      *
      * @var int
      */
     public $chunkCount = 100;
+
+    /**
+     * Each id is validated with its own existence query, so this bounds the work a single request
+     * can ask for. Lower it on an action whose blast radius should stay small.
+     */
+    public int $maxResources = 1000;
 
     /**
      * Get the name of the action.
@@ -86,10 +100,16 @@ class Action implements \JsonSerializable
     /**
      * Mark the action as a standalone action.
      *
+     * @throws InvalidActionStateException
+     *
      * @return $this
      */
     public function standalone()
     {
+        if ($this->targeted) {
+            throw new InvalidActionStateException('An action cannot be both standalone and targeted.');
+        }
+
         $this->standalone = true;
 
         return $this;
@@ -103,6 +123,37 @@ class Action implements \JsonSerializable
     public function isStandalone()
     {
         return $this->standalone;
+    }
+
+    /**
+     * Mark the action as a targeted action, requiring an explicit list of resource ids.
+     *
+     * The caller names the models to act on, so a search is prohibited and the action can never
+     * impact every model the way an unscoped classic action does.
+     *
+     * @throws InvalidActionStateException
+     *
+     * @return $this
+     */
+    public function targeted()
+    {
+        if ($this->standalone) {
+            throw new InvalidActionStateException('An action cannot be both standalone and targeted.');
+        }
+
+        $this->targeted = true;
+
+        return $this;
+    }
+
+    /**
+     * Determine if the action is a targeted action.
+     *
+     * @return bool
+     */
+    public function isTargeted()
+    {
+        return $this->targeted;
     }
 
     /**
@@ -120,6 +171,7 @@ class Action implements \JsonSerializable
             'fields'     => $this->fields($request),
             'meta'       => $this->meta(),
             'standalone' => $this->isStandalone(),
+            'targeted'   => $this->isTargeted(),
         ];
     }
 

@@ -35,8 +35,12 @@ trait PerformSearch
     {
         $this->resource->authorizeTo('viewAny', $this->resource::$model);
 
+        // The perimeter runs in a subquery so that an "or" inside it cannot swallow the
+        // constraints appended afterwards, which bind tighter than it does
         $this->when(!$this->disableSecurity, function () {
-            $this->resource->searchQuery(app()->make(RestRequest::class), $this->queryBuilder);
+            $this->queryBuilder->where(function ($query) {
+                $this->resource->searchQuery(app()->make(RestRequest::class), $query);
+            });
         });
 
         // Here we run the filters in a subquery to avoid conflicts
