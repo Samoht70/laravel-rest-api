@@ -311,6 +311,9 @@ class SendWelcomeNotificationAction extends \Lomkit\Rest\Actions\Action
     // Mutually exclusive with $standalone.
     // public $targeted = true;
 
+    // Optional. Cap on how many ids a targeted action accepts (default 1000).
+    // public $maxResources = 1000;
+
     // Optional. Batch size when processing models (default 100).
     // public $chunkCount = 100;
 
@@ -361,7 +364,9 @@ An action has exactly one of three targeting states, which decides what the requ
 Reach for `targeted()` when an action must never be able to hit every model by accident: the caller has
 to name its targets, and omitting `resources` is a `422` rather than a silent mass update. Unknown ids
 are also a `422`; ids the caller is not allowed to see are skipped. `standalone()` and `targeted()` are
-mutually exclusive and throw `InvalidActionStateException` if combined.
+mutually exclusive and throw `InvalidActionStateException` if combined. `resources` is capped at
+`$maxResources` ids per request (default 1000) — lower it per action when the blast radius should be
+smaller.
 
 ```jsonc
 // POST /api/users/actions/deactivate-users

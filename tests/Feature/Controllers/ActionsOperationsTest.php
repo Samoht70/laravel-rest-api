@@ -563,6 +563,46 @@ class ActionsOperationsTest extends TestCase
         $this->assertEquals(0, Model::where('number', 100000000)->count());
     }
 
+    public function test_operate_targeted_action_rejects_more_resources_than_the_action_allows(): void
+    {
+        $models = ModelFactory::new()->count(3)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/max-resources-modify-number',
+            [
+                'resources' => $models->pluck($models->first()->getKeyName())->all(),
+            ],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('resources');
+        $this->assertEquals(0, Model::where('number', 100000000)->count());
+    }
+
+    public function test_operate_targeted_action_accepts_resources_up_to_the_action_limit(): void
+    {
+        $models = ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/max-resources-modify-number',
+            [
+                'resources' => $models->pluck($models->first()->getKeyName())->all(),
+            ],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertJson([
+            'data' => [
+                'impacted' => 2,
+            ],
+        ]);
+    }
+
     public function test_operate_targeted_action_with_unknown_resource_is_rejected(): void
     {
         ModelFactory::new()->create();

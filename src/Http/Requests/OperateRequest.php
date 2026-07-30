@@ -56,7 +56,7 @@ class OperateRequest extends RestRequest
                     ? ['prohibited']
                     : [(new Search())->setResource($this->resource)],
                 'resources' => $operatedAction->isTargeted()
-                    ? ['required', 'array']
+                    ? ['required', 'array', 'max:'.$operatedAction->maxResources]
                     : ['prohibited'],
                 'resources.*' => $operatedAction->isTargeted()
                     ? [Rule::exists($model::class, $model->getKeyName())]
