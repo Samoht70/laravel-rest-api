@@ -72,14 +72,10 @@ class Action implements \JsonSerializable
     public $chunkCount = 100;
 
     /**
-     * The maximum number of ids a targeted action accepts in its resources key.
-     *
      * Each id is validated with its own existence query, so this bounds the work a single request
      * can ask for. Lower it on an action whose blast radius should stay small.
-     *
-     * @var int
      */
-    public $maxResources = 1000;
+    public int $maxResources = 1000;
 
     /**
      * Get the name of the action.

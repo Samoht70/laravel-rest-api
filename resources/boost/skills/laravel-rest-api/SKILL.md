@@ -312,7 +312,7 @@ class SendWelcomeNotificationAction extends \Lomkit\Rest\Actions\Action
     // public $targeted = true;
 
     // Optional. Cap on how many ids a targeted action accepts (default 1000).
-    // public $maxResources = 1000;
+    // public int $maxResources = 1000;
 
     // Optional. Batch size when processing models (default 100).
     // public $chunkCount = 100;
