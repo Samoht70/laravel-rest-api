@@ -119,12 +119,12 @@ class DispatchAction
      *
      * @param int $chunkCount The number of models to process per chunk.
      *
-     * @return int The effective result limit if set, or the total count of models.
+     * @return int The effective result limit if set, or the number of models dispatched.
      */
     public function handleClassic(int $chunkCount)
     {
-        return $this->handleSearchQuery(
-            $this->searchQuery($this->request->input('search', [])),
+        return $this->dispatchInChunks(
+            $this->modelsQuery($this->request->input('search', [])),
             $chunkCount
         );
     }
@@ -132,7 +132,7 @@ class DispatchAction
     /**
      * Processes the models explicitly targeted by the request and dispatches an action for each set.
      *
-     * The caller names the models by id, so no search parameters are accepted. The query still runs
+     * The caller names the models by id, so no search parameters are accepted. The query still goes
      * through the resource search pipeline, which is what applies the resource's authorization
      * perimeter and default ordering to the targeted ids.
      *
@@ -142,43 +142,46 @@ class DispatchAction
      */
     public function handleTargeted(int $chunkCount)
     {
-        return $this->handleSearchQuery(
-            $this->searchQuery()->whereKey($this->request->input('resources', [])),
+        return $this->dispatchInChunks(
+            $this->modelsQuery()->whereKey($this->request->input('resources', [])),
             $chunkCount
         );
     }
 
     /**
-     * Build the search query resolving the models the action applies to.
+     * Build the query resolving the models the action applies to.
      *
-     * @param array $parameters The search parameters to apply, empty when the caller names the models.
+     * The resource search pipeline is how the authorization perimeter and the default ordering get
+     * applied, so a targeted action goes through it too, passing no search parameters.
+     *
+     * @param array $searchParameters The search parameters to apply, empty when the caller names the models.
      *
      * @return Builder
      */
-    protected function searchQuery(array $parameters = [])
+    protected function modelsQuery(array $searchParameters = [])
     {
         return app()->make(QueryBuilder::class, ['resource' => $this->request->resource, 'query' => null])
             ->disableDefaultLimit()
-            ->search($parameters);
+            ->search($searchParameters);
     }
 
     /**
-     * Processes the given search query in chunks and dispatches an action for each set.
+     * Processes the given query in chunks and dispatches an action for each set.
      *
      * The count is accumulated as the chunks are dispatched rather than re-queried afterwards,
      * because an action that mutates a column the query filters on would no longer match.
      *
-     * @param Builder $searchQuery The query resolving the models to act on.
-     * @param int     $chunkCount  The number of models to process per chunk.
+     * @param Builder $query      The query resolving the models to act on.
+     * @param int     $chunkCount The number of models to process per chunk.
      *
      * @return int The effective result limit if set, or the number of models dispatched.
      */
-    protected function handleSearchQuery(Builder $searchQuery, int $chunkCount)
+    protected function dispatchInChunks(Builder $query, int $chunkCount)
     {
-        $limit = $searchQuery->toBase()->limit;
+        $limit = $query->toBase()->limit;
         $impacted = 0;
 
-        $searchQuery
+        $query
             ->clone()
             ->chunk(
                 $chunkCount,
