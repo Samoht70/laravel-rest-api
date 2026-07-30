@@ -28,6 +28,17 @@ class SearchInclude extends RestRule
                 $attribute.'.text' => [
                     'prohibited',
                 ],
+                $attribute.'.alias' => [
+                    'sometimes',
+                    'string',
+                    'max:255',
+                    // The alias is used verbatim as a model relation key and as a response key,
+                    // so it is restricted to what a relation name could have been.
+                    'regex:/^[A-Za-z_][A-Za-z0-9_]*$/',
+                    (new SearchIncludeAlias())
+                        ->setResource($this->resource)
+                        ->setRelation($value['relation'] ?? ''),
+                ],
             ]
         );
     }

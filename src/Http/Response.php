@@ -78,29 +78,24 @@ class Response implements Responsable
      */
     public function modelToResponse(Model $model, Resource $resource, array $requestArray, ?Relation $relation = null)
     {
-        $currentRequestArray = $relation === null ? $requestArray : collect($requestArray['includes'] ?? [])
-            ->first(function ($include) use ($relation) {
-                return preg_match('/(?:\.\b)?'.$relation->relation.'\b/', $include['relation']);
-            }) ?? [];
-
         return array_merge(
             // toArray to take advantage of Laravel's logic
             collect($model->attributesToArray())
                 ->only(
                     array_merge(
-                        isset($currentRequestArray['selects']) ?
-                                collect($currentRequestArray['selects'])->pluck('field')->toArray() :
+                        isset($requestArray['selects']) ?
+                                collect($requestArray['selects'])->pluck('field')->toArray() :
                                 $resource->getFields(app()->make(RestRequest::class)),
                         // Here we add the aggregates
-                        collect($currentRequestArray['aggregates'] ?? [])
+                        collect($requestArray['aggregates'] ?? [])
                             ->map(function ($aggregate) {
                                 return $aggregate['alias'] ?? Str::snake($aggregate['relation']).'_'.$aggregate['type'].(isset($aggregate['field']) ? '_'.$aggregate['field'] : '');
                             })
                             ->toArray()
                     )
                 )
-                ->when($resource->isGatingEnabled() && isset($currentRequestArray['gates']), function ($attributes) use ($currentRequestArray, $resource, $model) {
-                    $currentRequestArrayWithoutCreate = collect($currentRequestArray['gates'])->reject(fn ($value) => $value === 'create')->toArray();
+                ->when($resource->isGatingEnabled() && isset($requestArray['gates']), function ($attributes) use ($requestArray, $resource, $model) {
+                    $currentRequestArrayWithoutCreate = collect($requestArray['gates'])->reject(fn ($value) => $value === 'create')->toArray();
 
                     return $attributes->put(
                         config('rest.gates.key'),
@@ -109,8 +104,14 @@ class Response implements Responsable
                 })
                 ->toArray(),
             collect($model->getRelations())
-                ->mapWithKeys(function ($modelRelation, $relationName) use ($currentRequestArray, $relation, $resource) {
-                    $key = Str::snake($relationName);
+                ->mapWithKeys(function ($modelRelation, $relationName) use ($requestArray, $relation, $resource) {
+                    $currentInclude = collect($requestArray['includes'] ?? [])
+                        ->first(function ($include) use ($relationName) {
+                            return ($include['alias'] ?? $include['relation']) === $relationName;
+                        });
+
+                    $realRelation = $currentInclude['relation'] ?? $relationName;
+                    $key = $currentInclude['alias'] ?? Str::snake($realRelation);
 
                     if (is_null($modelRelation)) {
                         return [
@@ -124,15 +125,16 @@ class Response implements Responsable
                         ];
                     }
 
-                    $relationConcrete = $resource->relation($relationName);
+                    $relationConcrete = $resource->relation($realRelation);
                     $relationResource = $relationConcrete->resource();
+                    $nestedRequestArray = $this->requestArrayForRelation($requestArray, $currentInclude, $relationName);
 
                     if ($modelRelation instanceof Model) {
                         return [
                             $key => $this->modelToResponse(
                                 $modelRelation,
                                 $relationResource,
-                                $currentRequestArray,
+                                $nestedRequestArray,
                                 $relationConcrete
                             ),
                         ];
@@ -140,12 +142,46 @@ class Response implements Responsable
 
                     return [
                         $key => $modelRelation
-                            ->map(fn ($collectionRelation) => $this->modelToResponse($collectionRelation, $relationResource, $currentRequestArray, $relationConcrete))
+                            ->map(fn ($collectionRelation) => $this->modelToResponse($collectionRelation, $relationResource, $nestedRequestArray, $relationConcrete))
                             ->toArray(),
                     ];
                 })
                 ->toArray()
         );
+    }
+
+    /**
+     * Build the request array a relation is rendered with.
+     *
+     * A dotted include declares its parameters for the deepest relation of the path, the same way
+     * the query applies them, so every level above only forwards the remaining path downwards.
+     *
+     * @param array      $requestArray   Request parameters of the level being rendered.
+     * @param array|null $currentInclude The include matching the relation, if any.
+     * @param string     $relationName   The name the relation is loaded under.
+     *
+     * @return array The request parameters to render the relation with.
+     */
+    protected function requestArrayForRelation(array $requestArray, ?array $currentInclude, string $relationName): array
+    {
+        $forwardedIncludes = collect($requestArray['includes'] ?? [])
+            ->filter(function ($include) use ($relationName) {
+                return Str::contains($include['relation'], '.')
+                    && Str::before($include['relation'], '.') === $relationName;
+            })
+            ->map(function ($include) {
+                return array_merge($include, ['relation' => Str::after($include['relation'], '.')]);
+            })
+            ->values()
+            ->all();
+
+        $nestedRequestArray = $currentInclude ?? [];
+
+        if (!empty($forwardedIncludes)) {
+            $nestedRequestArray['includes'] = array_merge($nestedRequestArray['includes'] ?? [], $forwardedIncludes);
+        }
+
+        return $nestedRequestArray;
     }
 
     public function toResponse($request)
