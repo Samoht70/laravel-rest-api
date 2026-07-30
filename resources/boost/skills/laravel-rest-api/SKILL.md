@@ -37,7 +37,7 @@ Use this skill when working with the `lomkit/laravel-rest-api` package — build
 
 - **Search**: filterable, sortable, paginated reads with nested relation includes, aggregates, scopes, and per-row policy gates via `POST /{resource}/search`.
 - **Mutate**: batched create/update plus relation operations (`attach`, `detach`, `sync`, `toggle`) in one request via `POST /{resource}/mutate`.
-- **Actions**: custom mutators exposed under `/{resource}/actions/{uriKey}`, runnable against a `search`-resolved set of models or standalone. Generate with:
+- **Actions**: custom mutators exposed under `/{resource}/actions/{uriKey}`, runnable against a `search`-resolved set of models, against an explicit list of ids, or standalone. Generate with:
 
   ```bash
   php artisan rest:action SendWelcomeNotificationAction
@@ -187,7 +187,7 @@ All endpoints require `Accept: application/json` (enforced by `EnforceExpectsJso
 ```json
 {
   "data": {
-    "actions":      [{"uriKey": "publish-posts", "name": "...", "fields": {...}, "meta": {...}, "is_standalone": false}],
+    "actions":      [{"uriKey": "publish-posts", "name": "...", "fields": {...}, "meta": {...}, "standalone": false, "targeted": false}],
     "instructions": [{"uriKey": "odd-even-id",   "name": "...", "fields": {...}, "meta": {...}}],
     "fields":       ["id", "name", ...],
     "scout_fields": [...],
@@ -307,6 +307,10 @@ class SendWelcomeNotificationAction extends \Lomkit\Rest\Actions\Action
     // Optional. Set to true if the action operates without targeting models.
     // public $standalone = true;
 
+    // Optional. Set to true to require the caller to name the models by id.
+    // Mutually exclusive with $standalone.
+    // public $targeted = true;
+
     // Optional. Batch size when processing models (default 100).
     // public $chunkCount = 100;
 
@@ -345,6 +349,24 @@ POST /api/users/actions/send-welcome-notification-action
 ```
 
 Note the **`fields` payload is an array of `{name, value}` pairs**, not an object. The `search` block resolves the target models (whole `search` schema is supported). Standalone actions (`->standalone()` or `public $standalone = true`) omit `search` and receive an empty collection.
+
+An action has exactly one of three targeting states, which decides what the request body may carry:
+
+| State | `search` | `resources` | Models impacted |
+|---|---|---|---|
+| `standalone()` | prohibited | prohibited | none, `handle()` gets an empty collection |
+| classic (default) | optional | prohibited | whatever `search` resolves — **every model when `search` is omitted** |
+| `targeted()` | prohibited | required, array of ids | exactly the ids named, minus any the resource's perimeter hides |
+
+Reach for `targeted()` when an action must never be able to hit every model by accident: the caller has
+to name its targets, and omitting `resources` is a `422` rather than a silent mass update. Unknown ids
+are also a `422`; ids the caller is not allowed to see are skipped. `standalone()` and `targeted()` are
+mutually exclusive and throw `InvalidActionStateException` if combined.
+
+```jsonc
+// POST /api/users/actions/deactivate-users
+{ "resources": [1, 5, 9], "fields": [{ "name": "reason", "value": "spam" }] }
+```
 
 **Field validation follows standard Laravel rules.** The rules declared in `fields()` are evaluated as a normal Laravel validation: presence and cross-field rules (`required`, `required_if`, `present`, …) fire even when a field is absent from the `fields` array. Validation errors are keyed by field name — `fields.{name}` (e.g. `fields.expires_at`) — while an unauthorized field name is reported positionally as `fields.{index}.name`.
 

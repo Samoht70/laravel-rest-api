@@ -21,6 +21,7 @@ use Lomkit\Rest\Relations\MorphToMany;
 use Lomkit\Rest\Tests\Support\Models\Model;
 use Lomkit\Rest\Tests\Support\Rest\Actions\BatchableModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\ConditionalFieldAction;
+use Lomkit\Rest\Tests\Support\Rest\Actions\ConflictingStateModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\ModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\QueueableModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\RequiredFieldAction;
@@ -145,6 +146,7 @@ class ModelResource extends Resource
             ModifyNumberAction::make(),
             StandaloneModifyNumberAction::make()->standalone(),
             TargetedModifyNumberAction::make()->targeted(),
+            ConflictingStateModifyNumberAction::make(),
             QueueableModifyNumberAction::make(),
             WithMetaModifyNumberAction::make(),
             BatchableModifyNumberAction::make(),

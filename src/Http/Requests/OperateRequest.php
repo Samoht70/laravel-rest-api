@@ -4,6 +4,7 @@ namespace Lomkit\Rest\Http\Requests;
 
 use Illuminate\Validation\Rule;
 use Lomkit\Rest\Actions\Action;
+use Lomkit\Rest\Exceptions\InvalidActionStateException;
 use Lomkit\Rest\Rules\Operate\OperateFields;
 use Lomkit\Rest\Rules\Search\Search;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -43,18 +44,22 @@ class OperateRequest extends RestRequest
 
         $operatedAction = $this->resource->action($this, $this->route()->parameter('action'));
 
+        if ($operatedAction->isStandalone() && $operatedAction->isTargeted()) {
+            throw new InvalidActionStateException('An action cannot be both standalone and targeted.');
+        }
+
         $model = $this->resource::newModel();
 
         return array_merge(
             [
-                'search' => $operatedAction->isStandalone()
+                'search' => $operatedAction->isStandalone() || $operatedAction->isTargeted()
                     ? ['prohibited']
                     : [(new Search())->setResource($this->resource)],
                 'resources' => $operatedAction->isTargeted()
                     ? ['required', 'array']
                     : ['prohibited'],
                 'resources.*' => $operatedAction->isTargeted()
-                    ? [Rule::exists($model->getTable(), $model->getKeyName())]
+                    ? [Rule::exists($model::class, $model->getKeyName())]
                     : [],
             ],
             [

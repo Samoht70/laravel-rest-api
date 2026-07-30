@@ -58,7 +58,7 @@ class Action implements \JsonSerializable
     public $standalone = false;
 
     /**
-     * Indicates if the action requires an explicit list of resources to target.
+     * Indicates if the action requires an explicit list of resource ids and prohibits a search.
      *
      * @var bool
      */
@@ -121,6 +121,9 @@ class Action implements \JsonSerializable
 
     /**
      * Mark the action as a targeted action, requiring an explicit list of resource ids.
+     *
+     * The caller names the models to act on, so a search is prohibited and the action can never
+     * impact every model the way an unscoped classic action does.
      *
      * @throws InvalidActionStateException
      *

@@ -92,7 +92,7 @@ class DispatchAction
      *
      * @throws \Throwable
      *
-     * @return $this
+     * @return int The number of models impacted by the action.
      */
     public function dispatch($chunkCount)
     {
@@ -123,19 +123,22 @@ class DispatchAction
      */
     public function handleClassic(int $chunkCount)
     {
-        return $this->handleSearchQuery($this->searchQuery(), $chunkCount);
+        return $this->handleSearchQuery(
+            $this->searchQuery($this->request->input('search', [])),
+            $chunkCount
+        );
     }
 
     /**
      * Processes the models explicitly targeted by the request and dispatches an action for each set.
      *
-     * The ids given in the request's resources key narrow the search query, so the impacted models
-     * are the intersection of those ids and whatever the search resolves. Everything else behaves
-     * as classic mode.
+     * The caller names the models by id, so no search parameters are accepted. The query still runs
+     * through the resource search pipeline, which is what applies the resource's authorization
+     * perimeter and default ordering to the targeted ids.
      *
      * @param int $chunkCount The number of models to process per chunk.
      *
-     * @return int The effective result limit if set, or the total count of models.
+     * @return int The total count of impacted models.
      */
     public function handleTargeted(int $chunkCount)
     {
@@ -148,48 +151,57 @@ class DispatchAction
     /**
      * Build the search query resolving the models the action applies to.
      *
+     * @param array $parameters The search parameters to apply, empty when the caller names the models.
+     *
      * @return Builder
      */
-    protected function searchQuery()
+    protected function searchQuery(array $parameters = [])
     {
         return app()->make(QueryBuilder::class, ['resource' => $this->request->resource, 'query' => null])
             ->disableDefaultLimit()
-            ->search($this->request->input('search', []));
+            ->search($parameters);
     }
 
     /**
      * Processes the given search query in chunks and dispatches an action for each set.
      *
+     * The count is accumulated as the chunks are dispatched rather than re-queried afterwards,
+     * because an action that mutates a column the query filters on would no longer match.
+     *
      * @param Builder $searchQuery The query resolving the models to act on.
      * @param int     $chunkCount  The number of models to process per chunk.
      *
-     * @return int The effective result limit if set, or the total count of models.
+     * @return int The effective result limit if set, or the number of models dispatched.
      */
     protected function handleSearchQuery(Builder $searchQuery, int $chunkCount)
     {
         $limit = $searchQuery->toBase()->limit;
+        $impacted = 0;
 
         $searchQuery
             ->clone()
             ->chunk(
                 $chunkCount,
-                function ($chunk, $page) use ($limit, $chunkCount) {
+                function ($chunk, $page) use ($limit, $chunkCount, &$impacted) {
                     $collection = \Illuminate\Database\Eloquent\Collection::make($chunk);
 
                     // This is to remove for Laravel 12, chunking with limit does not work
                     // in Laravel 11
                     if (!is_null($limit) && $page * $chunkCount >= $limit) {
                         $collection = $collection->take($limit - ($page - 1) * $chunkCount);
+                        $impacted += $collection->count();
                         $this->forModels($collection);
 
                         return false;
                     }
 
+                    $impacted += $collection->count();
+
                     return $this->forModels($collection);
                 }
             );
 
-        return $limit ?? $searchQuery->count();
+        return $limit ?? $impacted;
     }
 
     /**
