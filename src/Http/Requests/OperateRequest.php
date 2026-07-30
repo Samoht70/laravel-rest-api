@@ -50,10 +50,10 @@ class OperateRequest extends RestRequest
                 'search' => $operatedAction->isStandalone()
                     ? ['prohibited']
                     : [(new Search())->setResource($this->resource)],
-                'resources' => $operatedAction->isRestricted()
+                'resources' => $operatedAction->isTargeted()
                     ? ['required', 'array']
                     : ['prohibited'],
-                'resources.*' => $operatedAction->isRestricted()
+                'resources.*' => $operatedAction->isTargeted()
                     ? [Rule::exists($model->getTable(), $model->getKeyName())]
                     : [],
             ],

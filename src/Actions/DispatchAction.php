@@ -131,7 +131,7 @@ class DispatchAction
                 ->disableDefaultLimit()
                 ->search($this->request->input('search', []));
 
-        if ($this->action->isRestricted()) {
+        if ($this->action->isTargeted()) {
             $searchQuery->whereKey($this->request->input('resources', []));
         }
 

@@ -2,6 +2,6 @@
 
 namespace Lomkit\Rest\Tests\Support\Rest\Actions;
 
-class RestrictedModifyNumberAction extends ModifyNumberAction
+class TargetedModifyNumberAction extends ModifyNumberAction
 {
 }

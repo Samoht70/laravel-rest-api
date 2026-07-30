@@ -526,14 +526,14 @@ class ActionsOperationsTest extends TestCase
         $response->assertJsonValidationErrors(['fields.0.name']);
     }
 
-    public function test_operate_restricted_action_without_resources_is_rejected(): void
+    public function test_operate_targeted_action_without_resources_is_rejected(): void
     {
         ModelFactory::new()->count(2)->create();
 
         Gate::policy(Model::class, GreenPolicy::class);
 
         $response = $this->post(
-            '/api/models/actions/restricted-modify-number',
+            '/api/models/actions/targeted-modify-number',
             [],
             ['Accept' => 'application/json']
         );
@@ -543,14 +543,14 @@ class ActionsOperationsTest extends TestCase
         $this->assertEquals(0, Model::where('number', 100000000)->count());
     }
 
-    public function test_operate_restricted_action_with_empty_resources_is_rejected(): void
+    public function test_operate_targeted_action_with_empty_resources_is_rejected(): void
     {
         ModelFactory::new()->count(2)->create();
 
         Gate::policy(Model::class, GreenPolicy::class);
 
         $response = $this->post(
-            '/api/models/actions/restricted-modify-number',
+            '/api/models/actions/targeted-modify-number',
             [
                 'resources' => [],
             ],
@@ -562,14 +562,14 @@ class ActionsOperationsTest extends TestCase
         $this->assertEquals(0, Model::where('number', 100000000)->count());
     }
 
-    public function test_operate_restricted_action_with_unknown_resource_is_rejected(): void
+    public function test_operate_targeted_action_with_unknown_resource_is_rejected(): void
     {
         ModelFactory::new()->create();
 
         Gate::policy(Model::class, GreenPolicy::class);
 
         $response = $this->post(
-            '/api/models/actions/restricted-modify-number',
+            '/api/models/actions/targeted-modify-number',
             [
                 'resources' => [999999],
             ],
@@ -581,7 +581,7 @@ class ActionsOperationsTest extends TestCase
         $this->assertEquals(0, Model::where('number', 100000000)->count());
     }
 
-    public function test_operate_restricted_action_impacts_only_the_given_resources(): void
+    public function test_operate_targeted_action_impacts_only_the_given_resources(): void
     {
         $first = ModelFactory::new()->create();
         $second = ModelFactory::new()->create();
@@ -590,7 +590,7 @@ class ActionsOperationsTest extends TestCase
         Gate::policy(Model::class, GreenPolicy::class);
 
         $response = $this->post(
-            '/api/models/actions/restricted-modify-number',
+            '/api/models/actions/targeted-modify-number',
             [
                 'resources' => [$first->getKey(), $third->getKey()],
             ],
@@ -607,7 +607,7 @@ class ActionsOperationsTest extends TestCase
         $this->assertNotEquals(100000000, $second->fresh()->number);
     }
 
-    public function test_operate_restricted_action_intersects_resources_and_search(): void
+    public function test_operate_targeted_action_intersects_resources_and_search(): void
     {
         $matchInScope = ModelFactory::new()->create(['string' => 'match']);
         $matchOutOfScope = ModelFactory::new()->create(['string' => 'match']);
@@ -616,7 +616,7 @@ class ActionsOperationsTest extends TestCase
         Gate::policy(Model::class, GreenPolicy::class);
 
         $response = $this->post(
-            '/api/models/actions/restricted-modify-number',
+            '/api/models/actions/targeted-modify-number',
             [
                 'resources' => [$matchInScope->getKey(), $noMatchInScope->getKey()],
                 'search'    => [
@@ -656,7 +656,7 @@ class ActionsOperationsTest extends TestCase
         $response->assertJsonValidationErrors('resources');
     }
 
-    public function test_restricted_flag_is_exposed_in_the_resource_schema(): void
+    public function test_targeted_flag_is_exposed_in_the_resource_schema(): void
     {
         Gate::policy(Model::class, GreenPolicy::class);
 
@@ -666,12 +666,12 @@ class ActionsOperationsTest extends TestCase
         );
 
         $response->assertJsonFragment([
-            'uriKey'     => 'restricted-modify-number',
-            'restricted' => true,
+            'uriKey'     => 'targeted-modify-number',
+            'targeted'   => true,
         ]);
         $response->assertJsonFragment([
             'uriKey'     => 'modify-number',
-            'restricted' => false,
+            'targeted'   => false,
         ]);
     }
 }

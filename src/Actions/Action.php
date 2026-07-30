@@ -58,11 +58,11 @@ class Action implements \JsonSerializable
     public $standalone = false;
 
     /**
-     * Indicates if the action requires a narrowing search.
+     * Indicates if the action requires an explicit list of resources to target.
      *
      * @var bool
      */
-    public $restricted = false;
+    public $targeted = false;
 
     /**
      * The number of models that should be included in each chunk.
@@ -100,8 +100,8 @@ class Action implements \JsonSerializable
      */
     public function standalone()
     {
-        if ($this->restricted) {
-            throw new InvalidActionStateException('An action cannot be both standalone and restricted.');
+        if ($this->targeted) {
+            throw new InvalidActionStateException('An action cannot be both standalone and targeted.');
         }
 
         $this->standalone = true;
@@ -120,31 +120,31 @@ class Action implements \JsonSerializable
     }
 
     /**
-     * Mark the action as a restricted action, forcing a narrowing search.
+     * Mark the action as a targeted action, requiring an explicit list of resource ids.
      *
      * @throws InvalidActionStateException
      *
      * @return $this
      */
-    public function restricted()
+    public function targeted()
     {
         if ($this->standalone) {
-            throw new InvalidActionStateException('An action cannot be both standalone and restricted.');
+            throw new InvalidActionStateException('An action cannot be both standalone and targeted.');
         }
 
-        $this->restricted = true;
+        $this->targeted = true;
 
         return $this;
     }
 
     /**
-     * Determine if the action is a restricted action.
+     * Determine if the action is a targeted action.
      *
      * @return bool
      */
-    public function isRestricted()
+    public function isTargeted()
     {
-        return $this->restricted;
+        return $this->targeted;
     }
 
     /**
@@ -162,7 +162,7 @@ class Action implements \JsonSerializable
             'fields'     => $this->fields($request),
             'meta'       => $this->meta(),
             'standalone' => $this->isStandalone(),
-            'restricted' => $this->isRestricted(),
+            'targeted'   => $this->isTargeted(),
         ];
     }
 

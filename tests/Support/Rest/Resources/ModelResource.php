@@ -24,8 +24,8 @@ use Lomkit\Rest\Tests\Support\Rest\Actions\ConditionalFieldAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\ModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\QueueableModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\RequiredFieldAction;
-use Lomkit\Rest\Tests\Support\Rest\Actions\RestrictedModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\StandaloneModifyNumberAction;
+use Lomkit\Rest\Tests\Support\Rest\Actions\TargetedModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\WithMetaModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Instructions\ConditionalInstruction;
 use Lomkit\Rest\Tests\Support\Rest\Instructions\NumberedInstruction;
@@ -144,7 +144,7 @@ class ModelResource extends Resource
         return [
             ModifyNumberAction::make(),
             StandaloneModifyNumberAction::make()->standalone(),
-            RestrictedModifyNumberAction::make()->restricted(),
+            TargetedModifyNumberAction::make()->targeted(),
             QueueableModifyNumberAction::make(),
             WithMetaModifyNumberAction::make(),
             BatchableModifyNumberAction::make(),
