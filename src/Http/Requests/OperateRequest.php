@@ -6,6 +6,7 @@ use Illuminate\Validation\Rule;
 use Lomkit\Rest\Actions\Action;
 use Lomkit\Rest\Exceptions\InvalidActionStateException;
 use Lomkit\Rest\Rules\Operate\OperateFields;
+use Lomkit\Rest\Rules\Operate\OperateQueueableFields;
 use Lomkit\Rest\Rules\Search\Search;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -67,6 +68,7 @@ class OperateRequest extends RestRequest
                     'sometimes',
                     'array',
                     (new OperateFields())->setAction($operatedAction),
+                    (new OperateQueueableFields())->setAction($operatedAction),
                 ],
                 'fields.*.name' => [
                     Rule::in(array_keys($operatedAction->fields($this))),
@@ -99,6 +101,6 @@ class OperateRequest extends RestRequest
      */
     public function resolveFields(Action $action)
     {
-        return $this->input('fields', []);
+        return $this->all()['fields'] ?? [];
     }
 }

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Lomkit\Rest\Http\Requests\RestRequest;
+use Lomkit\Rest\Support\Fields;
 
 trait PerformSearch
 {
@@ -190,7 +191,7 @@ trait PerformSearch
     {
         $this->resource->instruction(app(RestRequest::class), $name)
             ->handle(
-                collect($fields)->mapWithKeys(function ($field) {return [$field['name'] => $field['value']]; })->toArray(),
+                Fields::pivot($fields),
                 $this->queryBuilder
             );
     }

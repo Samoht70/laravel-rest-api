@@ -378,6 +378,15 @@ smaller.
 
 **Field validation follows standard Laravel rules.** The rules declared in `fields()` are evaluated as a normal Laravel validation: presence and cross-field rules (`required`, `required_if`, `present`, …) fire even when a field is absent from the `fields` array. Validation errors are keyed by field name — `fields.{name}` (e.g. `fields.expires_at`) — while an unauthorized field name is reported positionally as `fields.{index}.name`.
 
+**Uploaded files are supported as field values.** Declare the rules as you would anywhere else —
+`'avatar' => ['required', 'file', 'image', 'max:1024']` — and send the request as `multipart/form-data`
+with `fields[0][name]=avatar` and `fields[0][value]=<file>`. `handle()` receives the
+`Illuminate\Http\UploadedFile` under `$fields['avatar']`, already validated against the declared rules,
+so there is nothing to re-check inside the action. Errors are keyed `fields.avatar` like any other field.
+A file cannot be queued — PHP deletes the temporary upload when the request ends — so sending one to an
+action implementing `ShouldQueue` or `BatchableAction` is a `422` keyed `fields.{name}`, rejected before
+anything is enqueued. Store the file yourself and pass the path if the work has to be deferred.
+
 **Response**: `{"data": {"impacted": 150}}`.
 
 **Queuing**: implement `Illuminate\Contracts\Queue\ShouldQueue` to dispatch one job per chunk of `$chunkCount` models. Combine with `Lomkit\Rest\Actions\Contracts\BatchableAction` and use `withBatch()` to register `then`/`catch`/`finally` callbacks. Customise `$connection` and `$queue` properties to route jobs.

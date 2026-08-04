@@ -191,7 +191,7 @@ class Action implements \JsonSerializable
     /**
      * Register callbacks on the pending batch.
      *
-     * @param array                        $fields
+     * @param array                        $fields The submitted fields, keyed by field name.
      * @param \Illuminate\Bus\PendingBatch $batch
      *
      * @return void

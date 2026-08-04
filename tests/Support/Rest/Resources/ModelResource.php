@@ -22,8 +22,10 @@ use Lomkit\Rest\Tests\Support\Models\Model;
 use Lomkit\Rest\Tests\Support\Rest\Actions\BatchableModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\ConditionalFieldAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\ConflictingStateModifyNumberAction;
+use Lomkit\Rest\Tests\Support\Rest\Actions\FileFieldAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\MaxResourcesModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\ModifyNumberAction;
+use Lomkit\Rest\Tests\Support\Rest\Actions\QueueableFileFieldAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\QueueableModifyNumberAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\RequiredFieldAction;
 use Lomkit\Rest\Tests\Support\Rest\Actions\StandaloneModifyNumberAction;
@@ -154,6 +156,8 @@ class ModelResource extends Resource
             BatchableModifyNumberAction::make(),
             RequiredFieldAction::make(),
             ConditionalFieldAction::make(),
+            FileFieldAction::make(),
+            QueueableFileFieldAction::make(),
         ];
     }
 

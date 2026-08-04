@@ -3,8 +3,10 @@
 namespace Lomkit\Rest\Tests\Feature\Controllers;
 
 use Illuminate\Bus\PendingBatch;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Queue;
 use Lomkit\Rest\Actions\CallRestApiAction;
 use Lomkit\Rest\Exceptions\InvalidActionStateException;
 use Lomkit\Rest\Tests\Feature\TestCase;
@@ -250,7 +252,7 @@ class ActionsOperationsTest extends TestCase
 
         Gate::policy(Model::class, GreenPolicy::class);
 
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
 
         $response = $this->post(
             '/api/models/actions/queueable-modify-number',
@@ -258,7 +260,7 @@ class ActionsOperationsTest extends TestCase
             ['Accept' => 'application/json']
         );
 
-        \Illuminate\Support\Facades\Queue::assertPushedOn('custom-queue', CallRestApiAction::class);
+        Queue::assertPushedOn('custom-queue', CallRestApiAction::class);
     }
 
     public function test_operate_action_with_search(): void
@@ -509,6 +511,195 @@ class ActionsOperationsTest extends TestCase
         );
 
         $response->assertSuccessful();
+    }
+
+    public function test_operate_action_with_uploaded_file_field(): void
+    {
+        ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/file-field',
+            [
+                'fields' => [
+                    ['name' => 'avatar', 'value' => UploadedFile::fake()->image('avatar.jpg')],
+                ],
+            ],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertJson([
+            'data' => [
+                'impacted' => 2,
+            ],
+        ]);
+        $this->assertEquals(
+            2,
+            Model::where('name', 'avatar.jpg')->count()
+        );
+    }
+
+    public function test_operate_action_with_uploaded_file_field_alongside_a_scalar_field(): void
+    {
+        ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/file-field',
+            [
+                'fields' => [
+                    ['name' => 'avatar', 'value' => UploadedFile::fake()->image('mixed.jpg')],
+                    ['name' => 'number', 'value' => 100000001],
+                ],
+            ],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertSuccessful();
+        $this->assertEquals(
+            2,
+            Model::where('name', 'mixed.jpg')->where('number', 100000001)->count()
+        );
+    }
+
+    public function test_operate_action_with_uploaded_file_field_of_the_wrong_type_is_rejected(): void
+    {
+        ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/file-field',
+            [
+                'fields' => [
+                    ['name' => 'avatar', 'value' => UploadedFile::fake()->create('document.pdf', 10, 'application/pdf')],
+                ],
+            ],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(422);
+        $response->assertExactJsonStructure(['message', 'errors' => ['fields.avatar']]);
+    }
+
+    public function test_operate_action_with_uploaded_file_field_exceeding_max_is_rejected(): void
+    {
+        ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/file-field',
+            [
+                'fields' => [
+                    ['name' => 'avatar', 'value' => UploadedFile::fake()->image('huge.jpg')->size(2048)],
+                ],
+            ],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(422);
+        $response->assertExactJsonStructure(['message', 'errors' => ['fields.avatar']]);
+    }
+
+    public function test_operate_action_with_required_uploaded_file_field_absent(): void
+    {
+        ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/file-field',
+            ['fields' => [['name' => 'number', 'value' => 100000001]]],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(422);
+        $response->assertExactJsonStructure(['message', 'errors' => ['fields.avatar']]);
+    }
+
+    public function test_operate_queued_action_with_uploaded_file_field_is_refused(): void
+    {
+        ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        Queue::fake();
+
+        $response = $this->post(
+            '/api/models/actions/queueable-file-field',
+            [
+                'fields' => [
+                    ['name' => 'avatar', 'value' => UploadedFile::fake()->image('avatar.jpg')],
+                ],
+            ],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(422);
+        $response->assertExactJsonStructure(['message', 'errors' => ['fields.avatar']]);
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_operate_queued_action_without_uploaded_file_field_is_allowed(): void
+    {
+        ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/queueable-modify-number',
+            [
+                'fields' => [
+                    ['name' => 'number', 'value' => 100000001],
+                ],
+            ],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertSuccessful();
+    }
+
+    public function test_operate_action_with_non_array_fields_does_not_report_declared_field_errors(): void
+    {
+        ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/required-field',
+            ['fields' => 'not-an-array'],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(422);
+        $response->assertExactJsonStructure(['message', 'errors' => ['fields']]);
+    }
+
+    public function test_operate_queueable_action_receives_fields_keyed_by_name(): void
+    {
+        ModelFactory::new()->count(2)->create();
+
+        Gate::policy(Model::class, GreenPolicy::class);
+
+        $response = $this->post(
+            '/api/models/actions/queueable-modify-number',
+            [
+                'fields' => [
+                    ['name' => 'number', 'value' => 100000001],
+                ],
+            ],
+            ['Accept' => 'application/json']
+        );
+
+        $response->assertSuccessful();
+        $this->assertEquals(
+            2,
+            Model::where('number', 100000001)->count()
+        );
     }
 
     public function test_operate_action_with_non_string_field_name_is_rejected(): void

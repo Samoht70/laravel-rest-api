@@ -12,6 +12,7 @@ use Lomkit\Rest\Contracts\BatchableAction;
 use Lomkit\Rest\Contracts\QueryBuilder;
 use Lomkit\Rest\Http\Requests\OperateRequest;
 use Lomkit\Rest\Http\Requests\RestRequest;
+use Lomkit\Rest\Support\Fields;
 
 class DispatchAction
 {
@@ -30,7 +31,7 @@ class DispatchAction
     protected $action;
 
     /**
-     * The fields for the action.
+     * The action fields, keyed by field name.
      *
      * @var array
      */
@@ -48,7 +49,7 @@ class DispatchAction
      *
      * @param OperateRequest $request
      * @param Action         $action
-     * @param array          $fields
+     * @param array          $fields  The raw positional field list.
      *
      * @return void
      */
@@ -56,10 +57,10 @@ class DispatchAction
     {
         $this->request = $request;
         $this->action = $action;
-        $this->fields = $fields;
+        $this->fields = Fields::pivot($fields);
 
         if ($action instanceof BatchableAction) {
-            $this->configureBatchJob($action, $fields);
+            $this->configureBatchJob($action, $this->fields);
         }
     }
 
@@ -67,7 +68,7 @@ class DispatchAction
      * Configure the batch job for the action.
      *
      * @param \Lomkit\Rest\Actions\Action $action
-     * @param array                       $fields
+     * @param array                       $fields The action fields, keyed by field name.
      *
      * @return void
      */
@@ -255,10 +256,7 @@ class DispatchAction
     protected function dispatchSynchronouslyForCollection(Collection $models)
     {
         return DB::transaction(function () use ($models) {
-            return $this->action->handle(
-                collect($this->fields)->mapWithKeys(function ($field) {return [$field['name'] => $field['value']]; })->toArray(),
-                $models
-            );
+            return $this->action->handle($this->fields, $models);
         });
     }
 

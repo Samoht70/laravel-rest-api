@@ -4,6 +4,7 @@ namespace Lomkit\Rest\Rules\Concerns;
 
 use Illuminate\Support\Facades\Validator as ValidatorFactory;
 use Illuminate\Validation\Validator;
+use Lomkit\Rest\Support\Fields;
 
 trait ValidatesFields
 {
@@ -27,18 +28,7 @@ trait ValidatesFields
             return;
         }
 
-        $pivoted = collect($submittedFields)
-            ->filter(function ($field) {
-                return is_array($field)
-                    && array_key_exists('name', $field)
-                    && is_string($field['name']);
-            })
-            ->mapWithKeys(function ($field) {
-                return [$field['name'] => $field['value'] ?? null];
-            })
-            ->toArray();
-
-        $fieldsValidator = ValidatorFactory::make($pivoted, $declaredRules);
+        $fieldsValidator = ValidatorFactory::make(Fields::pivot($submittedFields), $declaredRules);
 
         foreach ($fieldsValidator->errors()->messages() as $name => $messages) {
             foreach ($messages as $message) {

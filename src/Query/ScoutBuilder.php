@@ -2,11 +2,11 @@
 
 namespace Lomkit\Rest\Query;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Traits\Conditionable;
 use Lomkit\Rest\Contracts\QueryBuilder;
 use Lomkit\Rest\Http\Requests\RestRequest;
 use Lomkit\Rest\Http\Resource;
+use Lomkit\Rest\Support\Fields;
 
 class ScoutBuilder implements QueryBuilder
 {
@@ -162,7 +162,7 @@ class ScoutBuilder implements QueryBuilder
     {
         $this->resource->scoutInstruction(app(RestRequest::class), $name)
             ->handleScout(
-                collect($fields)->mapWithKeys(function ($field) {return [$field['name'] => $field['value']]; })->toArray(),
+                Fields::pivot($fields),
                 $this->queryBuilder
             );
     }

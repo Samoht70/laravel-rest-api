@@ -313,6 +313,19 @@ class RequestBody extends Schema
                                 ->generate()
                         )
                         ->generate(),
+                    'multipart/form-data' => (new MediaType())
+                        ->withExample(
+                            (new Example())
+                                ->withValue(
+                                    [
+                                        'fields' => [
+                                            ['name' => 'avatar', 'value' => '<file>'],
+                                        ],
+                                    ]
+                                )
+                                ->generate()
+                        )
+                        ->generate(),
                 ]
             )
             ->generate();

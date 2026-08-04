@@ -32,7 +32,7 @@ class CallRestApiAction
     protected \Lomkit\Rest\Actions\Action $action;
 
     /**
-     * The fields for the action instance.
+     * The fields for the action instance, keyed by field name.
      *
      * @var array
      */
